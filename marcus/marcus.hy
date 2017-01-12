@@ -172,7 +172,7 @@
     (print "Available search fields:")
     (print "\t" (.join " " (list-comp (.replace (name k) "-" "_") [k (whoosh-schema.keys)])))))
 
-(if (= __name__ "__main__")
+(defn main [argv]
   (try
     (cond
       [(in "--index" sys.argv) (index-bookmarks)]
@@ -180,4 +180,7 @@
       [True (usage sys.argv)])
     (catch [e KeyboardInterrupt]
       (print "Exiting."))))
+
+(if (= __name__ "__main__")
+  (main sys.argv))
 
