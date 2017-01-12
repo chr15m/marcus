@@ -92,8 +92,9 @@
           [index (load-whoosh-index)]
           [searcher (index.searcher)]
           [known-urls (dict-comp (get s "url_id") s [s (searcher.documents)])]
+          [known-good-urls (list-comp u [[u v] (known-urls.items)] (or (not (.get v "fail_count" None)) (>= (.get v "fail_count" None) fail-count-limit)))]
           [bookmarks-count (len bookmarks)]]
-      (print (% "Indexing %d / %d bookmarks" (, (- (len bookmarks) (len (.keys known-urls))) (len bookmarks))))
+      (print (% "Indexing %d / %d bookmarks" (, (- (len bookmarks) (len known-good-urls)) (len bookmarks))))
       (for [idx (range (len bookmarks))]
         (let [[[visits date_added url title hash] (get bookmarks idx)]
               [existing-doc (.get known-urls url {})]]
@@ -103,7 +104,7 @@
           (let [[fail-count (.get existing-doc "fail_count" nil)]]
             (if (and fail-count (< fail-count fail-count-limit))
               ;(print (% "fail count for %s is %d" (, url fail-count)))
-              (print "Retrying" url))
+              (print "Retrying" url (% "(%d/ %d) times" (, fail-count (- fail-count-limit 1)))))
             (when (or
                     (not existing-doc)
                     (and fail-count (< fail-count fail-count-limit)))
