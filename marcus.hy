@@ -5,13 +5,19 @@
   [sqlite3]
   [urllib2]
   [httplib]
+  [socket]
   [hashlib [sha256]]
   [glob [glob]]
   [datetime [datetime]]
   [os [path makedirs]]
   [html2text [html2text]]
+  [subprocess [call PIPE]]
   [whoosh.index [create_in open_dir]]
-  [whoosh.fields [Schema ID TEXT DATETIME NUMERIC]])
+  [whoosh.fields [Schema ID TEXT DATETIME NUMERIC]]
+  [whoosh.qparser [MultifieldParser]]
+  [whoosh.qparser.dateparse [DateParserPlugin]])
+
+(require hy.contrib.loop)
 
 ; https://stackoverflow.com/questions/492483/setting-the-correct-encoding-when-piping-stdout-in-python
 (reload sys)
@@ -19,7 +25,21 @@
 
 (def bookmarks-query "select moz_places.visit_count, moz_bookmarks.dateAdded, moz_places.url, moz_bookmarks.title from moz_places, moz_bookmarks where moz_places.id=moz_bookmarks.fk;")
 
-(def whoosh-schema {"url" (ID :stored true :unique true) "title" (TEXT :stored true) "content_markdown" (TEXT :stored true) "date_added" (DATETIME :stored true) "fail_count" (NUMERIC :stored true)})
+(def whoosh-schema {"url_id" (ID :stored true :unique true) "url" (TEXT :stored true) "title" (TEXT :stored true) "content_markdown" (TEXT :stored true) "date_added" (DATETIME :stored true) "fail_count" (NUMERIC :stored true) "fail_code" (TEXT :stored true)})
+
+(def fail-count-limit 5)
+
+(defn check-host [host]
+  (loop [[times [1 5 10 15]] [status false]]    
+    (let [[timeout (get times 0)]
+          [result (or (and (try
+                             (urllib2.urlopen host :timeout timeout)
+                             (catch [e Exception] None)) true)
+                    status)]
+          [remaining (slice times 1)]]
+      (if (and remaining (not result))
+        (recur remaining result)
+        (or result status)))))
 
 (defn load-bookmarks []
   ; load up the default places.sqlite
@@ -44,10 +64,8 @@
 
 (defn get-url [url]
   (try
-    (.read (urllib2.urlopen url))
-    (catch [e urllib2.HTTPError] None)
-    (catch [e urllib2.URLError] None)
-    (catch [e httplib.BadStatusLine])))
+    [None (.read (urllib2.urlopen url))]
+    (catch [e Exception] [(unicode e) None])))
 
 (defn index-doc [index add-or-update doc]
   (let [[writer (index.writer)]]
@@ -55,35 +73,74 @@
     (writer.commit)))
 
 (defn index-bookmarks []
-  (let [[bookmarks (load-bookmarks)]
-        [index (load-whoosh-index)]
-        [searcher (index.searcher)]
-        [known-urls (dict-comp (get s "url") s [s (searcher.documents)])]
-        [bookmarks-count (len bookmarks)]]
-    (print (% "%d bookmarks" (len bookmarks)))
-    (for [idx (range (len bookmarks))]
-      (let [[[visits date_added url title hash] (get bookmarks idx)]
-            [existing-doc (.get known-urls url {})]]
-        ;(print w)
-        ;(print index.schema)
-        ;(print url (in url known-urls))
-        (let [[fail-count (.get existing-doc "fail_count" nil)]]
-          (if fail-count
-            (print (% "fail count for %s is %d" (, url fail-count))))
-          (when (or
-                  (not existing-doc)
-                  (and fail-count (< fail-count 5)))
-            (let [[page (get-url url)]
-                  [parsed (when page (html2text (unicode page)))]]
-              (print (% "Indexing %s (%d / %d) %d%% done" (, url idx bookmarks-count (/ (* 100 idx) bookmarks-count))))
-              (index-doc index
-                         (if existing-doc "update" "add")
-                         (if parsed
-                           {"url" (unicode url) "title" (unicode title) "content_markdown" (unicode parsed) "date_added" (datetime.fromtimestamp (/ date_added 1000000)) "fail_count" nil}
-                           {"url" (unicode url) "fail_count" (if fail-count (inc fail-count) 1)})))))))))
+  ; check we can reach at least one known-good site
+  (print "Start" (.strftime (.now datetime) "%Y-%m-%d %H:%M"))
+  (if (not (or (check-host "http://google.com") (check-host "http://wikipedia.org")))
+    (sys.exit "Bad internet connection.")
+    (let [[bookmarks (load-bookmarks)]
+          [index (load-whoosh-index)]
+          [searcher (index.searcher)]
+          [known-urls (dict-comp (get s "url_id") s [s (searcher.documents)])]
+          [bookmarks-count (len bookmarks)]]
+      (print (% "Indexing %d / %d bookmarks" (, (- (len bookmarks) (len (.keys known-urls))) (len bookmarks))))
+      (for [idx (range (len bookmarks))]
+        (let [[[visits date_added url title hash] (get bookmarks idx)]
+              [existing-doc (.get known-urls url {})]]
+          ;(print w)
+          ;(print index.schema)
+          ;(print url (in url known-urls))
+          (let [[fail-count (.get existing-doc "fail_count" nil)]]
+            (if (and fail-count (< fail-count fail-count-limit))
+              ;(print (% "fail count for %s is %d" (, url fail-count)))
+              (print "Retrying" url))
+            (when (or
+                    (not existing-doc)
+                    (and fail-count (< fail-count fail-count-limit)))
+              (let [[[error page] (get-url url)]
+                    [parsed (when (not error) (html2text (unicode page)))]
+                    [datetime-added (datetime.fromtimestamp (/ date_added 1000000))]]
+                (print (% "Indexing %s (%d / %d) %d%% done" (, url idx bookmarks-count (/ (* 100 idx) bookmarks-count))))
+                (index-doc index
+                           (if existing-doc "update" "add")
+                           (if parsed
+                             {"url_id" (unicode url) "url" (unicode url) "title" (unicode title) "content_markdown" (unicode parsed) "date_added" datetime-added "fail_count" nil}
+                             {"url_id" (unicode url) "url" (unicode url) "fail_count" (if fail-count (inc fail-count) 1) "fail_code" error  "date_added" datetime-added}))))))))))
 
 (defn perform-search [terms]
-  (print terms))
+  (let [[index (load-whoosh-index)]
+        [searcher (index.searcher)]
+        [query-parser (MultifieldParser ["url" "title" "content_markdown"] :schema index.schema)]
+        [_ (.add_plugin query-parser (DateParserPlugin))]
+        [query (query-parser.parse (.join " " terms))]
+        [results (searcher.search query :limit None)]]
+    (print query)
+    ;(print "Query:" (.join " " terms))
+    (print "found" (len results))
+    (print)
+    (for [i (range (len results))]
+      (let [[r (get results i)]
+            [url (.get r "url_id" "")]
+            [title (.get r "title" "")]
+            [date-added (.get r "date_added" "")]
+            [fail-count (.get r "fail_count" "")]
+            [index-number (+ "#" (unicode (+ i 1)) ".")]
+            [highlights (.split (html2text (r.highlights "content_markdown")) "\n")]]
+        (if (and fail-count (< fail-count fail-count-limit))
+          ; failed result
+          (do
+            (print index-number (+ "\t" url)))
+          ; regular result
+          (do
+            (if (and title (not (= title url)))
+              (do
+                (print index-number (+ "\t" title))
+                (print  (+ "\t" url)))
+              (print index-number (+ "\t" title)))
+            (print "\tAdded:" (.strftime date-added "%Y-%m-%d"))
+            (for [h highlights]
+              (if h
+                (print (+ "\t> ..." h "...")))))))
+      (print))))
 
 (defn usage [argv]
   (let [[bin (get argv 0)]]
