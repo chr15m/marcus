@@ -15,7 +15,8 @@
   [whoosh.index [create_in open_dir]]
   [whoosh.fields [Schema ID TEXT DATETIME NUMERIC]]
   [whoosh.qparser [MultifieldParser]]
-  [whoosh.qparser.dateparse [DateParserPlugin]])
+  [whoosh.qparser.dateparse [DateParserPlugin]]
+  [url_analyzer [url_analyzer]])
 
 (require hy.contrib.loop)
 
@@ -25,7 +26,13 @@
 
 (def bookmarks-query "select moz_places.visit_count, moz_bookmarks.dateAdded, moz_places.url, moz_bookmarks.title from moz_places, moz_bookmarks where moz_places.id=moz_bookmarks.fk;")
 
-(def whoosh-schema {"url_id" (ID :stored true :unique true) "url" (TEXT :stored true) "title" (TEXT :stored true) "content_markdown" (TEXT :stored true) "date_added" (DATETIME :stored true) "fail_count" (NUMERIC :stored true) "fail_code" (TEXT :stored true)})
+(def whoosh-schema {"url_id" (ID :stored true :unique true)
+                    "url" (TEXT :stored true :analyzer url_analyzer)
+                    "title" (TEXT :stored true)
+                    "content_markdown" (TEXT :stored true)
+                    "date_added" (DATETIME :stored true)
+                    "fail_count" (NUMERIC :stored true)
+                    "fail_code" (TEXT :stored true)})
 
 (def fail-count-limit 5)
 
@@ -96,10 +103,12 @@
             (when (or
                     (not existing-doc)
                     (and fail-count (< fail-count fail-count-limit)))
+              (print (% "Indexing %s (%d / %d) %d%% done" (, url idx bookmarks-count (/ (* 100 idx) bookmarks-count))))
               (let [[[error page] (get-url url)]
                     [parsed (when (not error) (html2text (unicode page)))]
                     [datetime-added (datetime.fromtimestamp (/ date_added 1000000))]]
-                (print (% "Indexing %s (%d / %d) %d%% done" (, url idx bookmarks-count (/ (* 100 idx) bookmarks-count))))
+                (if error
+                  (print error))
                 (index-doc index
                            (if existing-doc "update" "add")
                            (if parsed
@@ -113,7 +122,6 @@
         [_ (.add_plugin query-parser (DateParserPlugin))]
         [query (query-parser.parse (.join " " terms))]
         [results (searcher.search query :limit None)]]
-    (print query)
     ;(print "Query:" (.join " " terms))
     (print "found" (len results))
     (print)
@@ -122,13 +130,16 @@
             [url (.get r "url_id" "")]
             [title (.get r "title" "")]
             [date-added (.get r "date_added" "")]
-            [fail-count (.get r "fail_count" "")]
+            [fail-count (.get r "fail_count" None)]
+            [fail-code (.get r "fail_code" None)]
+            [content (.get r "content_markdown" None)]
             [index-number (+ "#" (unicode (+ i 1)) ".")]
-            [highlights (.split (html2text (r.highlights "content_markdown")) "\n")]]
-        (if (and fail-count (< fail-count fail-count-limit))
+            [highlights (if content (.split (html2text (r.highlights "content_markdown")) "\n"))]]
+        (if fail-count
           ; failed result
           (do
-            (print index-number (+ "\t" url)))
+            (print index-number (+ "\t" url))
+            (print (+ "\t" fail-code)))
           ; regular result
           (do
             (if (and title (not (= title url)))
@@ -157,6 +168,5 @@
     (cond
       [(in "--index" sys.argv) (index-bookmarks)]
       [(> (len sys.argv) 1) (perform-search (slice sys.argv 1))]
-      [True (usage sys.argv)])
-  )
+      [True (usage sys.argv)]))
 
