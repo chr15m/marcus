@@ -162,7 +162,7 @@
       (print))))
 
 (defn usage [argv]
-  (let [[bin (get argv 0)]]
+  (let [[bin (path.basename (get argv 0))]]
     (print "Usages:")
     (print "\t" bin "--index")
     (print "\t" bin "SEARCH TERMS ...")
