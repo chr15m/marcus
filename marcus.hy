@@ -10,6 +10,7 @@
   [glob [glob]]
   [datetime [datetime]]
   [os [path makedirs]]
+  [signal [signal SIGPIPE SIG_DFL]]
   [html2text [html2text]]
   [newspaper [Article]]
   [colorama]
@@ -25,6 +26,9 @@
 (reload sys)
 (sys.setdefaultencoding "utf8")
 
+; https://stackoverflow.com/a/16865106/2131094
+(signal SIGPIPE SIG_DFL)
+
 (colorama.init :autoreset true)
 
 (def bookmarks-query "select moz_places.visit_count, moz_bookmarks.dateAdded, moz_places.url, moz_bookmarks.title from moz_places, moz_bookmarks where moz_places.id=moz_bookmarks.fk;")
@@ -39,6 +43,8 @@
                     "fail_code" (TEXT :stored true)})
 
 (def fail-count-limit 5)
+
+
 
 (defn check-host [host]
   (loop [[times [1 5 10 15]] [status false]]    
@@ -98,12 +104,8 @@
       (for [idx (range (len bookmarks))]
         (let [[[visits date_added url title hash] (get bookmarks idx)]
               [existing-doc (.get known-urls url {})]]
-          ;(print w)
-          ;(print index.schema)
-          ;(print url (in url known-urls))
           (let [[fail-count (.get existing-doc "fail_count" nil)]]
             (if (and fail-count (< fail-count fail-count-limit))
-              ;(print (% "fail count for %s is %d" (, url fail-count)))
               (print "Retrying" url (% "(%d/ %d) times" (, fail-count (- fail-count-limit 1)))))
             (when (or
                     (not existing-doc)
@@ -128,7 +130,6 @@
         [_ (.add_plugin query-parser (DateParserPlugin))]
         [query (query-parser.parse (.join " " terms))]
         [results (searcher.search query :limit None)]]
-    ;(print "Query:" (.join " " terms))
     (print "found" (len results))
     (print)
     (for [i (range (len results))]
