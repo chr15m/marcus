@@ -11,6 +11,7 @@
   [datetime [datetime]]
   [os [path makedirs]]
   [html2text [html2text]]
+  [newspaper [Article]]
   [subprocess [call PIPE]]
   [whoosh.index [create_in open_dir]]
   [whoosh.fields [Schema ID TEXT DATETIME NUMERIC]]
@@ -29,6 +30,7 @@
 (def whoosh-schema {"url_id" (ID :stored true :unique true)
                     "url" (TEXT :stored true :analyzer url_analyzer)
                     "title" (TEXT :stored true)
+                    "content" (TEXT :stored true)
                     "content_markdown" (TEXT :stored true)
                     "date_added" (DATETIME :stored true)
                     "fail_count" (NUMERIC :stored true)
@@ -104,21 +106,22 @@
                     (not existing-doc)
                     (and fail-count (< fail-count fail-count-limit)))
               (print (% "Indexing %s (%d / %d) %d%% done" (, url idx bookmarks-count (/ (* 100 idx) bookmarks-count))))
-              (let [[[error page] (get-url url)]
-                    [parsed (when (not error) (html2text (unicode page)))]
+              (let [[a (Article url :fetch_images false)]
                     [datetime-added (datetime.fromtimestamp (/ date_added 1000000))]]
-                (if error
-                  (print error))
-                (index-doc index
-                           (if existing-doc "update" "add")
-                           (if parsed
-                             {"url_id" (unicode url) "url" (unicode url) "title" (unicode title) "content_markdown" (unicode parsed) "date_added" datetime-added "fail_count" nil}
-                             {"url_id" (unicode url) "url" (unicode url) "fail_count" (if fail-count (inc fail-count) 1) "fail_code" error  "date_added" datetime-added}))))))))))
+                (a.download)
+                (index-doc index (if existing-doc "update" "add")
+                           (if a.html
+                             (do
+                               (a.parse)
+                               {"url_id" (unicode url) "url" (unicode url) "title" (unicode title) "content" (unicode a.text) "content_markdown" (unicode (html2text a.html)) "date_added" datetime-added "fail_count" nil})
+                             (do
+                               (print "No content downloaded")
+                               {"url_id" (unicode url) "url" (unicode url) "fail_count" (if fail-count (inc fail-count) 1) "fail_code" "No content downloaded" "date_added" datetime-added})))))))))))
 
 (defn perform-search [terms]
   (let [[index (load-whoosh-index)]
         [searcher (index.searcher)]
-        [query-parser (MultifieldParser ["url" "title" "content_markdown"] :schema index.schema)]
+        [query-parser (MultifieldParser ["url" "title" "content"] :schema index.schema)]
         [_ (.add_plugin query-parser (DateParserPlugin))]
         [query (query-parser.parse (.join " " terms))]
         [results (searcher.search query :limit None)]]
@@ -132,9 +135,9 @@
             [date-added (.get r "date_added" "")]
             [fail-count (.get r "fail_count" None)]
             [fail-code (.get r "fail_code" None)]
-            [content (.get r "content_markdown" None)]
+            [content (.get r "content" None)]
             [index-number (+ "#" (unicode (+ i 1)) ".")]
-            [highlights (if content (.split (html2text (r.highlights "content_markdown")) "\n"))]]
+            [highlights (if content (.split (html2text (r.highlights "content")) "\n"))]]
         (if fail-count
           ; failed result
           (do
@@ -148,9 +151,10 @@
                 (print  (+ "\t" url)))
               (print index-number (+ "\t" title)))
             (print "\tAdded:" (.strftime date-added "%Y-%m-%d"))
-            (for [h highlights]
-              (if h
-                (print (+ "\t> ..." h "...")))))))
+            (when highlights
+              (for [h highlights]
+                (if h
+                  (print (+ "\t> ..." h "..."))))))))
       (print))))
 
 (defn usage [argv]
@@ -165,8 +169,11 @@
     (print "\t" (.join " " (list-comp (.replace (name k) "-" "_") [k (whoosh-schema.keys)])))))
 
 (if (= __name__ "__main__")
+  (try
     (cond
       [(in "--index" sys.argv) (index-bookmarks)]
       [(> (len sys.argv) 1) (perform-search (slice sys.argv 1))]
-      [True (usage sys.argv)]))
+      [True (usage sys.argv)])
+    (catch [e KeyboardInterrupt]
+      (print "Exiting."))))
 

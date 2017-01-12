@@ -1,5 +1,6 @@
 hy==0.11.1
 Whoosh==2.7.4
 html2text==2016.9.19
+newspaper==0.0.9.8
 pyasn1==0.1.9
 ndg_httpsclient==0.4.2
