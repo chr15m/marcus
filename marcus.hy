@@ -12,7 +12,7 @@
   [os [path makedirs]]
   [html2text [html2text]]
   [newspaper [Article]]
-  [subprocess [call PIPE]]
+  [colorama]
   [whoosh.index [create_in open_dir]]
   [whoosh.fields [Schema ID TEXT DATETIME NUMERIC]]
   [whoosh.qparser [MultifieldParser]]
@@ -24,6 +24,8 @@
 ; https://stackoverflow.com/questions/492483/setting-the-correct-encoding-when-piping-stdout-in-python
 (reload sys)
 (sys.setdefaultencoding "utf8")
+
+(colorama.init :autoreset true)
 
 (def bookmarks-query "select moz_places.visit_count, moz_bookmarks.dateAdded, moz_places.url, moz_bookmarks.title from moz_places, moz_bookmarks where moz_places.id=moz_bookmarks.fk;")
 
@@ -136,7 +138,7 @@
             [fail-count (.get r "fail_count" None)]
             [fail-code (.get r "fail_code" None)]
             [content (.get r "content" None)]
-            [index-number (+ "#" (unicode (+ i 1)) ".")]
+            [index-number (+ (unicode (+ i 1)) ".")]
             [highlights (if content (.split (html2text (r.highlights "content")) "\n"))]]
         (if fail-count
           ; failed result
@@ -147,14 +149,14 @@
           (do
             (if (and title (not (= title url)))
               (do
-                (print index-number (+ "\t" title))
-                (print  (+ "\t" url)))
+                (print index-number (+ "\t" colorama.Fore.BLUE colorama.Style.BRIGHT colorama.Style.BRIGHT title))
+                (print (+ "\t" colorama.Fore.GREEN url)))
               (print index-number (+ "\t" title)))
             (print "\tAdded:" (.strftime date-added "%Y-%m-%d"))
             (when highlights
               (for [h highlights]
                 (if h
-                  (print (+ "\t> ..." h "..."))))))))
+                  (print (+ "\t> ..."  colorama.Style.BRIGHT h colorama.Style.RESET_ALL "..."))))))))
       (print))))
 
 (defn usage [argv]
