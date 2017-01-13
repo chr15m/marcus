@@ -2,3 +2,5 @@
 *.pyc
 virtualenv
 marcus.egg-info
+MANIFEST
+dist
