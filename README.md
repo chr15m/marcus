@@ -2,13 +2,17 @@ Index and search browser bookmarks from the command line.
 
 Currently only works with Firefox bookmarks.
 
-Install:
+### Install
 
 	pip install marcus
 
 (hint: use `--user` to install into `~/.local/bin/`)
 
-Index your bookmarks. The first time you run this it will take a while, depending on how many bookmarks you have.
+Then run `marcus` (or `~/.local/bin/marcus`) with no arguments to get help.
+
+### Index your bookmarks
+
+The first time you run this it will take a while, depending on how many bookmarks you have.
 
 	$ marcus --index
 	Start 2017-01-12 21:20
@@ -17,7 +21,7 @@ Index your bookmarks. The first time you run this it will take a while, dependin
 	Indexing http://www.ubuntu.com/ (1 / 1081) 0% done
 	...
 
-Now run a search.
+### Full-text bookmark search
 
 	$ marcus privacy
 	found 84
@@ -44,7 +48,9 @@ Now run a search.
 	
 	...
 
-### Automated indexing ###
+You can also use [more complex queries](https://whoosh.readthedocs.io/en/latest/querylang.html) like `privacy AND github.com` for example.
+
+### Automated indexing
 
 Edit your user's crontab with `crontab -e` and then add a line at the bottom like this:
 
