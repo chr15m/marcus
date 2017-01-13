@@ -6,11 +6,11 @@ from distutils.core import setup
 try:
    import pypandoc
    long_description = pypandoc.convert('README.md', 'rst')
-except (IOError, ImportError):
+except:
    long_description = ''
 
 setup(name='marcus',
-      version='0.2',
+      version='0.3',
       description='Index and search bookmarks from the command line.',
       long_description=long_description,
       author='Chris McCormick',
