@@ -44,8 +44,6 @@
 
 (def fail-count-limit 5)
 
-
-
 (defn check-host [host]
   (loop [[times [1 5 10 15]] [status false]]    
     (let [[timeout (get times 0)]
@@ -99,9 +97,11 @@
           [searcher (index.searcher)]
           [known-urls (dict-comp (get s "url_id") s [s (searcher.documents)])]
           [known-good-urls (list-comp u [[u v] (known-urls.items)] (or (not (.get v "fail_count" None)) (>= (.get v "fail_count" None) fail-count-limit)))]
-          [bookmarks-count (len bookmarks)]]
-      (print (% "Indexing %d / %d bookmarks" (, (- (len bookmarks) (len known-good-urls)) (len bookmarks))))
-      (for [idx (range (len bookmarks))]
+          [bookmarks-count (len bookmarks)]
+          [to-process-count (- bookmarks-count (len known-good-urls))]]
+      (when to-process-count
+        (print (% "Indexing %d / %d bookmarks" (, to-process-count bookmarks-count))))
+      (for [idx (range bookmarks-count)]
         (let [[[visits date_added url title hash] (get bookmarks idx)]
               [existing-doc (.get known-urls url {})]]
           (let [[fail-count (.get existing-doc "fail_count" nil)]]
@@ -121,7 +121,8 @@
                                {"url_id" (unicode url) "url" (unicode url) "title" (unicode title) "content" (unicode a.text) "content_markdown" (unicode (html2text a.html)) "date_added" datetime-added "fail_count" nil})
                              (do
                                (print "No content downloaded")
-                               {"url_id" (unicode url) "url" (unicode url) "fail_count" (if fail-count (inc fail-count) 1) "fail_code" "No content downloaded" "date_added" datetime-added})))))))))))
+                               {"url_id" (unicode url) "url" (unicode url) "fail_count" (if fail-count (inc fail-count) 1) "fail_code" "No content downloaded" "date_added" datetime-added}))))))))))
+  (print "Done" (.strftime (.now datetime) "%Y-%m-%d %H:%M")))
 
 (defn perform-search [terms]
   (let [[index (load-whoosh-index)]
