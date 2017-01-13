@@ -4,7 +4,7 @@ Currently only works with Firefox bookmarks.
 
 Install:
 
-	pip install -e git+https://github.com/chr15m/marcus.git#egg=marcus
+	pip install marcus
 
 (hint: use `--user` to install into `~/.local/bin/`)
 
