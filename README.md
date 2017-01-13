@@ -13,6 +13,8 @@ Index your bookmarks. The first time you run this it will take a while, dependin
 	$ marcus --index
 	Start 2017-01-12 21:20
 	Indexing 10 / 1081 bookmarks
+	Indexing https://www.mozilla.org/en-US/firefox/central/ (0 / 1081) 0% done
+	Indexing http://www.ubuntu.com/ (1 / 1081) 0% done
 	...
 
 Now run a search.
@@ -41,5 +43,13 @@ Now run a search.
 		> ...limitation...
 	
 	...
+
+### Automated indexing ###
+
+Edit your user's crontab with `crontab -e` and then add a line at the bottom like this:
+
+	17 * * * * $PATH-TO-BINARY/marcus > $HOME/.marcus.log 2>&1
+
+Which will run the indexer every hour at 17 minutes past the hour. Pages which have already been indexed will not be indexed again.
 
 Patches welcome. Enjoy!
