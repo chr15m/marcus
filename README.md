@@ -48,7 +48,7 @@ Now run a search.
 
 Edit your user's crontab with `crontab -e` and then add a line at the bottom like this:
 
-	17 * * * * $PATH-TO-BINARY/marcus > $HOME/.marcus.log 2>&1
+	17 * * * * $PATH-TO-BINARY/marcus --index >> $HOME/.marcus.log 2>&1
 
 Which will run the indexer every hour at 17 minutes past the hour. Pages which have already been indexed will not be indexed again.
 
