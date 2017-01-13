@@ -2,9 +2,17 @@
 
 from distutils.core import setup
 
+# convert readme to thingy
+try:
+   import pypandoc
+   long_description = pypandoc.convert('README.md', 'rst')
+except (IOError, ImportError):
+   long_description = ''
+
 setup(name='marcus',
-      version='0.1',
+      version='0.2',
       description='Index and search bookmarks from the command line.',
+      long_description=long_description,
       author='Chris McCormick',
       author_email='chris@mccormick.cx',
       url='http://github.com/chr15m/marcus',
