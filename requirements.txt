@@ -1,4 +1,4 @@
-hy==0.11.1
+hy==0.12.0
 Whoosh==2.7.4
 html2text==2016.9.19
 newspaper==0.0.9.8
