@@ -10,7 +10,7 @@ except:
    long_description = ''
 
 setup(name='marcus',
-      version='0.3',
+      version='0.4',
       description='Index and search bookmarks from the command line.',
       long_description=long_description,
       author='Chris McCormick',
@@ -24,7 +24,7 @@ setup(name='marcus',
       #    'https://github.com/chr15m/...',
       #],
       install_requires=[
-          'hy==0.11.1',
+          'hy==0.12.0',
           'Whoosh==2.7.4',
           'html2text==2016.9.19',
           'newspaper==0.0.9.8',
