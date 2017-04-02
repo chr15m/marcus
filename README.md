@@ -1,6 +1,6 @@
 Index and search browser bookmarks from the command line.
 
-Currently only works with Firefox bookmarks.
+Works with Chrome and Firefox.
 
 ### Install
 
@@ -14,12 +14,20 @@ Then run `marcus` (or `~/.local/bin/marcus`) with no arguments to get help.
 
 The first time you run this it will take a while, depending on how many bookmarks you have.
 
-	$ marcus --index
+	$ marcus --index ~/.config/chromium/Default/Bookmarks
 	Start 2017-01-12 21:20
 	Indexing 10 / 1081 bookmarks
 	Indexing https://www.mozilla.org/en-US/firefox/central/ (0 / 1081) 0% done
 	Indexing http://www.ubuntu.com/ (1 / 1081) 0% done
 	...
+
+To find a list of bookmark files belonging to the current user:
+
+	$ marcus --find-bookmark-files
+
+Firefox on Linux example:
+
+	$ marcus --index ~/.mozilla/firefox/*.default/places.sqlite
 
 ### Full-text bookmark search
 
@@ -54,7 +62,7 @@ You can also use [more complex queries](https://whoosh.readthedocs.io/en/latest/
 
 Edit your user's crontab with `crontab -e` and then add a line at the bottom like this:
 
-	17 * * * * $PATH-TO-BINARY/marcus --index >> $HOME/.marcus.log 2>&1
+	17 * * * * $PATH-TO-BINARY/marcus --index ~/.config/chromium/Default/Bookmarks >> $HOME/.marcus.log 2>&1
 
 Which will run the indexer every hour at 17 minutes past the hour. Pages which have already been indexed will not be indexed again.
 
