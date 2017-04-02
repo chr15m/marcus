@@ -10,7 +10,7 @@ except:
    long_description = ''
 
 setup(name='marcus',
-      version='0.4',
+      version='0.5',
       description='Index and search bookmarks from the command line.',
       long_description=long_description,
       author='Chris McCormick',
