@@ -2,6 +2,18 @@ Index and search browser bookmarks from the command line.
 
 Works with Chrome and Firefox.
 
+	$ marcus "quantum cryptography"
+	found 9
+
+	1. 	Quantum cryptography - Wikipedia
+		https://en.wikipedia.org/wiki/Quantum_cryptography
+		Added: 2017-03-21
+		> ...known example of **quantum** **cryptography** is **quantum** key...
+		> ...distribution...application of **quantum** **cryptography** is **quantum** key...
+		> ...distribution...32] Post-**quantum** **cryptography** [ edit ] **Quantum**...
+		> ...computers may become...
+	...
+
 ### Install
 
 	pip install marcus
